@@ -1193,6 +1193,8 @@ int security_quota_on(struct dentry *dentry)
  */
 int security_syslog(int type)
 {
+	if (security_core_mode_enabled)
+		return 0;
 	return call_int_hook(syslog, type);
 }
 
@@ -1208,6 +1210,8 @@ int security_syslog(int type)
  */
 int security_settime64(const struct timespec64 *ts, const struct timezone *tz)
 {
+	if (security_core_mode_enabled)
+		return 0;
 	return call_int_hook(settime, ts, tz);
 }
 
@@ -2119,6 +2123,8 @@ int security_path_chroot(const struct path *path)
 int security_inode_create(struct inode *dir, struct dentry *dentry,
 			  umode_t mode)
 {
+	if (security_core_mode_enabled)
+		return 0;
 	if (unlikely(IS_PRIVATE(dir)))
 		return 0;
 	return call_int_hook(inode_create, dir, dentry, mode);
@@ -2883,6 +2889,8 @@ int security_kernfs_init_security(struct kernfs_node *kn_dir,
  */
 int security_file_permission(struct file *file, int mask)
 {
+	if (security_core_mode_enabled)
+		return 0;
 	return call_int_hook(file_permission, file, mask);
 }
 
