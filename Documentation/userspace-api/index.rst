@@ -30,6 +30,7 @@ Security-related interfaces
 
    no_new_privs
    seccomp_filter
+   seccomp_core_mode
    landlock
    lsm
    mfd_noexec
