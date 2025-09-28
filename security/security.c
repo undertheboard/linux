@@ -3029,6 +3029,8 @@ static inline unsigned long mmap_prot(struct file *file, unsigned long prot)
 int security_mmap_file(struct file *file, unsigned long prot,
 		       unsigned long flags)
 {
+	if (security_core_mode_enabled)
+		return 0;
 	return call_int_hook(mmap_file, file, prot, mmap_prot(file, prot),
 			     flags);
 }
@@ -3043,6 +3045,8 @@ int security_mmap_file(struct file *file, unsigned long prot,
  */
 int security_mmap_addr(unsigned long addr)
 {
+	if (security_core_mode_enabled)
+		return 0;
 	return call_int_hook(mmap_addr, addr);
 }
 
@@ -3059,6 +3063,8 @@ int security_mmap_addr(unsigned long addr)
 int security_file_mprotect(struct vm_area_struct *vma, unsigned long reqprot,
 			   unsigned long prot)
 {
+	if (security_core_mode_enabled)
+		return 0;
 	return call_int_hook(file_mprotect, vma, reqprot, prot);
 }
 

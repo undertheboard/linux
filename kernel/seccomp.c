@@ -1448,6 +1448,17 @@ static long seccomp_set_mode_core(void)
 	const unsigned long seccomp_mode = SECCOMP_MODE_CORE;
 	long ret = -EINVAL;
 
+	/*
+	 * Setting core mode requires that the task has
+	 * CAP_SYS_ADMIN in its namespace or be running with no_new_privs.
+	 * This allows regular users to enable core mode in environments like bash
+	 * when they set no_new_privs, similar to seccomp filters.
+	 */
+	if (!task_no_new_privs(current) &&
+			!ns_capable_noaudit(current_user_ns(), CAP_SYS_ADMIN)) {
+		return -EACCES;
+	}
+
 	spin_lock_irq(&current->sighand->siglock);
 
 	if (!seccomp_may_assign_mode(seccomp_mode))
