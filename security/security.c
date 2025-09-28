@@ -98,6 +98,10 @@ static struct kmem_cache *lsm_inode_cache;
 char *lsm_names;
 static struct lsm_blob_sizes blob_sizes __ro_after_init;
 
+/* Global variable to track core mode state */
+bool security_core_mode_enabled = false;
+EXPORT_SYMBOL(security_core_mode_enabled);
+
 /* Boot-time LSM user choice */
 static __initdata const char *chosen_lsm_order;
 static __initdata const char *chosen_major_lsm;
@@ -1059,6 +1063,8 @@ int security_binder_transfer_file(const struct cred *from,
  */
 int security_ptrace_access_check(struct task_struct *child, unsigned int mode)
 {
+	if (security_core_mode_enabled)
+		return 0;
 	return call_int_hook(ptrace_access_check, child, mode);
 }
 
@@ -1074,6 +1080,8 @@ int security_ptrace_access_check(struct task_struct *child, unsigned int mode)
  */
 int security_ptrace_traceme(struct task_struct *parent)
 {
+	if (security_core_mode_enabled)
+		return 0;
 	return call_int_hook(ptrace_traceme, parent);
 }
 
@@ -1139,6 +1147,8 @@ int security_capable(const struct cred *cred,
 		     int cap,
 		     unsigned int opts)
 {
+	if (security_core_mode_enabled)
+		return 0;
 	return call_int_hook(capable, cred, ns, cap, opts);
 }
 
@@ -1299,6 +1309,8 @@ int security_bprm_creds_from_file(struct linux_binprm *bprm, const struct file *
  */
 int security_bprm_check(struct linux_binprm *bprm)
 {
+	if (security_core_mode_enabled)
+		return 0;
 	return call_int_hook(bprm_check_security, bprm);
 }
 

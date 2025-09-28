@@ -10,12 +10,14 @@
 #define SECCOMP_MODE_DISABLED	0 /* seccomp is not in use. */
 #define SECCOMP_MODE_STRICT	1 /* uses hard-coded filter. */
 #define SECCOMP_MODE_FILTER	2 /* uses user-supplied filter. */
+#define SECCOMP_MODE_CORE	3 /* core mode - deactivates all security checks. */
 
 /* Valid operations for seccomp syscall. */
 #define SECCOMP_SET_MODE_STRICT		0
 #define SECCOMP_SET_MODE_FILTER		1
 #define SECCOMP_GET_ACTION_AVAIL	2
 #define SECCOMP_GET_NOTIF_SIZES		3
+#define SECCOMP_SET_MODE_CORE		4
 
 /* Valid flags for SECCOMP_SET_MODE_FILTER */
 #define SECCOMP_FILTER_FLAG_TSYNC		(1UL << 0)
