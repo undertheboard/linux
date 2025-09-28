@@ -25,6 +25,7 @@
 #include <linux/sched.h>
 #include <linux/sched/task_stack.h>
 #include <linux/seccomp.h>
+#include <linux/security.h>
 #include <linux/slab.h>
 #include <linux/syscalls.h>
 #include <linux/sysctl.h>
@@ -32,7 +33,7 @@
 #include <asm/syscall.h>
 
 /* Not exposed in headers: strictly internal use only. */
-#define SECCOMP_MODE_DEAD	(SECCOMP_MODE_FILTER + 1)
+#define SECCOMP_MODE_DEAD	(SECCOMP_MODE_CORE + 1)
 
 #ifdef CONFIG_SECCOMP_FILTER
 #include <linux/file.h>
@@ -1386,6 +1387,9 @@ int __secure_computing(void)
 		return 0;
 	case SECCOMP_MODE_FILTER:
 		return __seccomp_filter(this_syscall, false);
+	case SECCOMP_MODE_CORE:
+		/* Core mode: deactivate all security checks */
+		return 0;
 	/* Surviving SECCOMP_RET_KILL_* must be proactively impossible. */
 	case SECCOMP_MODE_DEAD:
 		WARN_ON_ONCE(1);
@@ -1423,6 +1427,35 @@ static long seccomp_set_mode_strict(void)
 	disable_TSC();
 #endif
 	seccomp_assign_mode(current, seccomp_mode, 0);
+	ret = 0;
+
+out:
+	spin_unlock_irq(&current->sighand->siglock);
+
+	return ret;
+}
+
+/**
+ * seccomp_set_mode_core: internal function for setting core seccomp mode
+ *
+ * Once current->seccomp.mode is non-zero, it may not be changed.
+ * Core mode deactivates all security checks globally.
+ *
+ * Returns 0 on success or -EINVAL on failure.
+ */
+static long seccomp_set_mode_core(void)
+{
+	const unsigned long seccomp_mode = SECCOMP_MODE_CORE;
+	long ret = -EINVAL;
+
+	spin_lock_irq(&current->sighand->siglock);
+
+	if (!seccomp_may_assign_mode(seccomp_mode))
+		goto out;
+
+	seccomp_assign_mode(current, seccomp_mode, 0);
+	/* Enable global core mode to bypass all security checks */
+	security_core_mode_enabled = true;
 	ret = 0;
 
 out:
@@ -2092,6 +2125,10 @@ static long do_seccomp(unsigned int op, unsigned int flags,
 		return seccomp_set_mode_strict();
 	case SECCOMP_SET_MODE_FILTER:
 		return seccomp_set_mode_filter(flags, uargs);
+	case SECCOMP_SET_MODE_CORE:
+		if (flags != 0 || uargs != NULL)
+			return -EINVAL;
+		return seccomp_set_mode_core();
 	case SECCOMP_GET_ACTION_AVAIL:
 		if (flags != 0)
 			return -EINVAL;
@@ -2138,6 +2175,10 @@ long prctl_set_seccomp(unsigned long seccomp_mode, void __user *filter)
 	case SECCOMP_MODE_FILTER:
 		op = SECCOMP_SET_MODE_FILTER;
 		uargs = filter;
+		break;
+	case SECCOMP_MODE_CORE:
+		op = SECCOMP_SET_MODE_CORE;
+		uargs = NULL;
 		break;
 	default:
 		return -EINVAL;

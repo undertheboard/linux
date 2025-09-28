@@ -98,6 +98,10 @@ static struct kmem_cache *lsm_inode_cache;
 char *lsm_names;
 static struct lsm_blob_sizes blob_sizes __ro_after_init;
 
+/* Global variable to track core mode state */
+bool security_core_mode_enabled = false;
+EXPORT_SYMBOL(security_core_mode_enabled);
+
 /* Boot-time LSM user choice */
 static __initdata const char *chosen_lsm_order;
 static __initdata const char *chosen_major_lsm;
@@ -1059,6 +1063,8 @@ int security_binder_transfer_file(const struct cred *from,
  */
 int security_ptrace_access_check(struct task_struct *child, unsigned int mode)
 {
+	if (security_core_mode_enabled)
+		return 0;
 	return call_int_hook(ptrace_access_check, child, mode);
 }
 
@@ -1074,6 +1080,8 @@ int security_ptrace_access_check(struct task_struct *child, unsigned int mode)
  */
 int security_ptrace_traceme(struct task_struct *parent)
 {
+	if (security_core_mode_enabled)
+		return 0;
 	return call_int_hook(ptrace_traceme, parent);
 }
 
@@ -1139,6 +1147,8 @@ int security_capable(const struct cred *cred,
 		     int cap,
 		     unsigned int opts)
 {
+	if (security_core_mode_enabled)
+		return 0;
 	return call_int_hook(capable, cred, ns, cap, opts);
 }
 
@@ -1183,6 +1193,8 @@ int security_quota_on(struct dentry *dentry)
  */
 int security_syslog(int type)
 {
+	if (security_core_mode_enabled)
+		return 0;
 	return call_int_hook(syslog, type);
 }
 
@@ -1198,6 +1210,8 @@ int security_syslog(int type)
  */
 int security_settime64(const struct timespec64 *ts, const struct timezone *tz)
 {
+	if (security_core_mode_enabled)
+		return 0;
 	return call_int_hook(settime, ts, tz);
 }
 
@@ -1299,6 +1313,8 @@ int security_bprm_creds_from_file(struct linux_binprm *bprm, const struct file *
  */
 int security_bprm_check(struct linux_binprm *bprm)
 {
+	if (security_core_mode_enabled)
+		return 0;
 	return call_int_hook(bprm_check_security, bprm);
 }
 
@@ -2107,6 +2123,8 @@ int security_path_chroot(const struct path *path)
 int security_inode_create(struct inode *dir, struct dentry *dentry,
 			  umode_t mode)
 {
+	if (security_core_mode_enabled)
+		return 0;
 	if (unlikely(IS_PRIVATE(dir)))
 		return 0;
 	return call_int_hook(inode_create, dir, dentry, mode);
@@ -2871,6 +2889,8 @@ int security_kernfs_init_security(struct kernfs_node *kn_dir,
  */
 int security_file_permission(struct file *file, int mask)
 {
+	if (security_core_mode_enabled)
+		return 0;
 	return call_int_hook(file_permission, file, mask);
 }
 
