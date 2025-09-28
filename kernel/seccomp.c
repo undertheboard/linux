@@ -437,8 +437,18 @@ static inline bool seccomp_may_assign_mode(unsigned long seccomp_mode)
 {
 	assert_spin_locked(&current->sighand->siglock);
 
-	if (current->seccomp.mode && current->seccomp.mode != seccomp_mode)
+	if (current->seccomp.mode && current->seccomp.mode != seccomp_mode) {
+		/*
+		 * Allow transitions to/from core mode for activation/deactivation.
+		 * Core mode can be activated from disabled state and deactivated
+		 * back to disabled state to support bash usage.
+		 */
+		if ((current->seccomp.mode == SECCOMP_MODE_CORE && seccomp_mode == SECCOMP_MODE_DISABLED) ||
+		    (current->seccomp.mode == SECCOMP_MODE_DISABLED && seccomp_mode == SECCOMP_MODE_CORE))
+			return true;
+		
 		return false;
+	}
 
 	return true;
 }
@@ -1475,6 +1485,50 @@ out:
 	return ret;
 }
 
+/**
+ * seccomp_set_mode_disabled: internal function for disabling seccomp (from core mode)
+ *
+ * This allows deactivating core mode back to disabled state.
+ * Only allowed when transitioning from SECCOMP_MODE_CORE.
+ *
+ * Returns 0 on success or -EINVAL on failure.
+ */
+static long seccomp_set_mode_disabled(void)
+{
+	const unsigned long seccomp_mode = SECCOMP_MODE_DISABLED;
+	long ret = -EINVAL;
+
+	/*
+	 * Deactivating core mode has the same privilege requirements as activating it.
+	 * This prevents unauthorized deactivation.
+	 */
+	if (!task_no_new_privs(current) &&
+			!ns_capable_noaudit(current_user_ns(), CAP_SYS_ADMIN)) {
+		return -EACCES;
+	}
+
+	spin_lock_irq(&current->sighand->siglock);
+
+	/* Only allow disabling from core mode */
+	if (current->seccomp.mode != SECCOMP_MODE_CORE) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (!seccomp_may_assign_mode(seccomp_mode))
+		goto out;
+
+	seccomp_assign_mode(current, seccomp_mode, 0);
+	/* Disable global core mode to restore security checks */
+	security_core_mode_enabled = false;
+	ret = 0;
+
+out:
+	spin_unlock_irq(&current->sighand->siglock);
+
+	return ret;
+}
+
 #ifdef CONFIG_SECCOMP_FILTER
 static void seccomp_notify_free(struct seccomp_filter *filter)
 {
@@ -2140,6 +2194,10 @@ static long do_seccomp(unsigned int op, unsigned int flags,
 		if (flags != 0 || uargs != NULL)
 			return -EINVAL;
 		return seccomp_set_mode_core();
+	case SECCOMP_SET_MODE_DISABLED:
+		if (flags != 0 || uargs != NULL)
+			return -EINVAL;
+		return seccomp_set_mode_disabled();
 	case SECCOMP_GET_ACTION_AVAIL:
 		if (flags != 0)
 			return -EINVAL;
@@ -2189,6 +2247,10 @@ long prctl_set_seccomp(unsigned long seccomp_mode, void __user *filter)
 		break;
 	case SECCOMP_MODE_CORE:
 		op = SECCOMP_SET_MODE_CORE;
+		uargs = NULL;
+		break;
+	case SECCOMP_MODE_DISABLED:
+		op = SECCOMP_SET_MODE_DISABLED;
 		uargs = NULL;
 		break;
 	default:

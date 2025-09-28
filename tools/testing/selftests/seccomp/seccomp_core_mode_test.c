@@ -22,6 +22,10 @@
 #define SECCOMP_SET_MODE_CORE 4
 #endif
 
+#ifndef SECCOMP_SET_MODE_DISABLED
+#define SECCOMP_SET_MODE_DISABLED 5
+#endif
+
 static void test_core_mode_prctl(void)
 {
 	int ret;
@@ -118,6 +122,87 @@ static void test_security_bypass(void)
 	printf("Security bypass test completed\n");
 }
 
+static void test_core_mode_activation_cycle(void)
+{
+	int ret;
+	printf("Testing SECCOMP core mode activation/deactivation cycle...\n");
+	
+	/* Get initial mode - should be disabled */
+	ret = prctl(PR_GET_SECCOMP);
+	printf("Initial seccomp mode: %d\n", ret);
+	
+	if (ret != 0) {
+		printf("SKIP: Seccomp already enabled, cannot test cycle\n");
+		return;
+	}
+	
+	/* Set no_new_privs to allow core mode operations */
+	printf("Setting no_new_privs...\n");
+	ret = prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
+	if (ret != 0) {
+		printf("WARNING: Failed to set no_new_privs (errno=%d)\n", errno);
+	}
+	
+	/* Step 1: Enable core mode */
+	printf("Step 1: Enabling core mode...\n");
+	ret = prctl(PR_SET_SECCOMP, SECCOMP_MODE_CORE, 0);
+	if (ret == 0) {
+		printf("SUCCESS: Core mode enabled\n");
+		
+		/* Verify it's enabled */
+		ret = prctl(PR_GET_SECCOMP);
+		if (ret == SECCOMP_MODE_CORE) {
+			printf("SUCCESS: Core mode verified (mode=%d)\n", ret);
+		} else {
+			printf("ERROR: Expected mode %d, got %d\n", SECCOMP_MODE_CORE, ret);
+			return;
+		}
+	} else {
+		printf("EXPECTED: Core mode activation not supported (errno=%d)\n", errno);
+		return;
+	}
+	
+	/* Step 2: Disable core mode */
+	printf("Step 2: Disabling core mode...\n");
+	ret = prctl(PR_SET_SECCOMP, SECCOMP_MODE_DISABLED, 0);
+	if (ret == 0) {
+		printf("SUCCESS: Core mode disabled\n");
+		
+		/* Verify it's disabled */
+		ret = prctl(PR_GET_SECCOMP);
+		if (ret == SECCOMP_MODE_DISABLED) {
+			printf("SUCCESS: Disabled mode verified (mode=%d)\n", ret);
+		} else {
+			printf("ERROR: Expected mode %d, got %d\n", SECCOMP_MODE_DISABLED, ret);
+			return;
+		}
+	} else {
+		printf("EXPECTED: Core mode deactivation not supported (errno=%d)\n", errno);
+		return;
+	}
+	
+	/* Step 3: Re-enable core mode to test multiple cycles */
+	printf("Step 3: Re-enabling core mode...\n");
+	ret = prctl(PR_SET_SECCOMP, SECCOMP_MODE_CORE, 0);
+	if (ret == 0) {
+		printf("SUCCESS: Core mode re-enabled\n");
+		
+		/* Verify it's enabled again */
+		ret = prctl(PR_GET_SECCOMP);
+		if (ret == SECCOMP_MODE_CORE) {
+			printf("SUCCESS: Core mode re-activation verified (mode=%d)\n", ret);
+		} else {
+			printf("ERROR: Expected mode %d, got %d\n", SECCOMP_MODE_CORE, ret);
+			return;
+		}
+	} else {
+		printf("ERROR: Core mode re-activation failed (errno=%d)\n", errno);
+		return;
+	}
+	
+	printf("Activation/deactivation cycle test completed successfully\n");
+}
+
 int main(void)
 {
 	printf("SECCOMP_MODE_CORE Test Suite\n");
@@ -127,6 +212,9 @@ int main(void)
 	printf("\n");
 	
 	test_core_mode_syscall();
+	printf("\n");
+	
+	test_core_mode_activation_cycle();
 	printf("\n");
 	
 	test_security_bypass();

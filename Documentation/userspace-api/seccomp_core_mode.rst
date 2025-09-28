@@ -8,6 +8,9 @@ security checks in the Linux kernel. This mode provides a mechanism to bypass
 all Linux Security Module (LSM) checks, capability checks, and other security
 restrictions.
 
+**NEW**: Core mode can now be activated and deactivated directly from bash and
+other userspace applications, allowing dynamic security control.
+
 WARNING: This mode completely disables kernel security mechanisms and should only
 be used in controlled environments for debugging or specialized use cases.
 
@@ -33,7 +36,11 @@ Core mode requires either:
    #include <sys/prctl.h>
    #include <linux/seccomp.h>
    
+   // Enable core mode
    int ret = prctl(PR_SET_SECCOMP, SECCOMP_MODE_CORE, 0);
+   
+   // Disable core mode (return to normal security)
+   int ret = prctl(PR_SET_SECCOMP, SECCOMP_MODE_DISABLED, 0);
    ```
 
 2. Via seccomp(2) syscall:
@@ -41,7 +48,26 @@ Core mode requires either:
    #include <sys/syscall.h>
    #include <linux/seccomp.h>
    
+   // Enable core mode
    int ret = syscall(SYS_seccomp, SECCOMP_SET_MODE_CORE, 0, NULL);
+   
+   // Disable core mode
+   int ret = syscall(SYS_seccomp, SECCOMP_SET_MODE_DISABLED, 0, NULL);
+   ```
+
+3. Via bash utility (new):
+   ```bash
+   # Source the utility functions
+   source tools/seccomp_core_mode_bash.sh
+   
+   # Enable core mode
+   seccomp_core_mode_enable
+   
+   # Check status
+   seccomp_core_mode_status
+   
+   # Disable core mode
+   seccomp_core_mode_disable
    ```
 
 Mode Values
@@ -50,6 +76,13 @@ Mode Values
 - SECCOMP_MODE_STRICT (1): uses hard-coded filter
 - SECCOMP_MODE_FILTER (2): uses user-supplied filter
 - SECCOMP_MODE_CORE (3): deactivates all security checks
+
+Mode Transitions
+----------------
+Core mode supports the following transitions:
+- DISABLED ↔ CORE: Can be activated and deactivated
+- Other modes → CORE: Not supported (security restriction)
+- CORE → Other modes (except DISABLED): Not supported
 
 Security Implications
 --------------------
@@ -71,14 +104,18 @@ Core mode works by:
 1. Setting a global flag `security_core_mode_enabled` when activated
 2. Modifying security hook functions to return success when this flag is set
 3. Bypassing seccomp filtering in the syscall path
+4. Allowing bidirectional transitions between DISABLED and CORE modes
 
 The implementation affects the following subsystems:
 - security/security.c: Core LSM framework
 - kernel/seccomp.c: Seccomp subsystem  
 - include/linux/security.h: Security headers
 - Memory security functions: mmap_file, mmap_addr, file_mprotect
-- include/linux/security.h: Security headers
 - include/uapi/linux/seccomp.h: User API headers
+
+New Operations
+--------------
+- SECCOMP_SET_MODE_DISABLED (5): Deactivate core mode and return to disabled state
 
 Testing
 -------
@@ -93,11 +130,17 @@ make seccomp_core_mode_test
 
 **Bash Usage Example:**
 ```bash
-# Set no_new_privs to allow core mode activation
-prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
+# Source bash utilities
+source tools/seccomp_core_mode_bash.sh
 
-# Now activate core mode from bash or any user process
-prctl(PR_SET_SECCOMP, SECCOMP_MODE_CORE, 0);
+# Check current status
+seccomp_core_mode_status
+
+# Enable core mode (disables all security checks)
+seccomp_core_mode_enable
+
+# Disable core mode (restores security checks)  
+seccomp_core_mode_disable
 ```
 
 Use Cases
@@ -107,6 +150,7 @@ This mode is intended for:
 - Security research in controlled environments  
 - Specialized embedded systems where security is handled externally
 - Performance testing without security overhead
+- Interactive debugging sessions where security restrictions interfere
 
 IMPORTANT: Never enable core mode in production systems or systems connected
 to untrusted networks, as it completely disables kernel security mechanisms.
