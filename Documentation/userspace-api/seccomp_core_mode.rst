@@ -13,7 +13,20 @@ be used in controlled environments for debugging or specialized use cases.
 
 Usage
 -----
-Core mode can be enabled through two interfaces:
+Core mode can be enabled through two interfaces, but requires appropriate privileges:
+
+**Privilege Requirements:**
+Core mode requires either:
+- CAP_SYS_ADMIN capability in the current user namespace, OR  
+- The no_new_privs flag to be set (allows regular users in environments like bash)
+
+**Setting no_new_privs:**
+   ```c
+   #include <sys/prctl.h>
+   
+   // Allow regular users to enable core mode
+   prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
+   ```
 
 1. Via prctl(2):
    ```c
@@ -46,8 +59,11 @@ When core mode is enabled:
 - File permission checks are bypassed
 - Process tracing restrictions are lifted
 - System call filtering is disabled
+- **Memory modification checks are bypassed** (mmap, mprotect, etc.)
 
-This effectively disables all kernel security mechanisms globally.
+This effectively disables all kernel security mechanisms globally, including
+memory protection policies that would normally restrict executable memory
+allocations and permission changes.
 
 Implementation Details
 ---------------------
@@ -58,7 +74,9 @@ Core mode works by:
 
 The implementation affects the following subsystems:
 - security/security.c: Core LSM framework
-- kernel/seccomp.c: Seccomp subsystem
+- kernel/seccomp.c: Seccomp subsystem  
+- include/linux/security.h: Security headers
+- Memory security functions: mmap_file, mmap_addr, file_mprotect
 - include/linux/security.h: Security headers
 - include/uapi/linux/seccomp.h: User API headers
 
@@ -71,6 +89,15 @@ Build the test:
 cd tools/testing/selftests/seccomp
 make seccomp_core_mode_test
 ./seccomp_core_mode_test
+```
+
+**Bash Usage Example:**
+```bash
+# Set no_new_privs to allow core mode activation
+prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
+
+# Now activate core mode from bash or any user process
+prctl(PR_SET_SECCOMP, SECCOMP_MODE_CORE, 0);
 ```
 
 Use Cases
