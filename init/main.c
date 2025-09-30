@@ -918,10 +918,9 @@ void start_kernel(void)
 	page_address_init();
 	pr_notice("%s", linux_banner);
 	setup_arch(&command_line);
-	/* Static keys and static calls are needed by LSMs */
+	/* Static keys and static calls initialization */
 	jump_label_init();
 	static_call_init();
-	early_security_init();
 	setup_boot_config();
 	setup_command_line(command_line);
 	setup_nr_cpu_ids();
@@ -1075,7 +1074,6 @@ void start_kernel(void)
 	uts_ns_init();
 	time_ns_init();
 	key_init();
-	security_init();
 	dbg_late_init();
 	net_ns_init();
 	vfs_caches_init();
