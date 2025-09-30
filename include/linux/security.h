@@ -682,6 +682,11 @@ static inline int security_inode_copy_up_xattr(struct dentry *src,
 	return -EOPNOTSUPP;
 }
 
+static inline void
+security_inode_post_create_tmpfile(struct mnt_idmap *idmap, struct inode *inode)
+{
+}
+
 static inline int security_inode_setintegrity(const struct inode *inode,
 					       enum lsm_integrity_type type,
 					       const void *value, size_t size)
@@ -1448,6 +1453,76 @@ static inline void security_initramfs_populated(void)
 }
 
 static inline int security_perf_event_open(int type)
+{
+	return 0;
+}
+
+/* Path-based security functions */
+static inline int security_path_unlink(const struct path *dir, struct dentry *dentry)
+{
+	return 0;
+}
+
+static inline int security_path_mkdir(const struct path *dir, struct dentry *dentry,
+				      umode_t mode)
+{
+	return 0;
+}
+
+static inline int security_path_rmdir(const struct path *dir, struct dentry *dentry)
+{
+	return 0;
+}
+
+static inline int security_path_mknod(const struct path *dir, struct dentry *dentry,
+				      umode_t mode, unsigned int dev)
+{
+	return 0;
+}
+
+static inline void security_path_post_mknod(struct mnt_idmap *idmap,
+					    struct dentry *dentry)
+{
+}
+
+static inline int security_path_truncate(const struct path *path)
+{
+	return 0;
+}
+
+static inline int security_path_symlink(const struct path *dir, struct dentry *dentry,
+					const char *old_name)
+{
+	return 0;
+}
+
+static inline int security_path_link(struct dentry *old_dentry,
+				     const struct path *new_dir,
+				     struct dentry *new_dentry)
+{
+	return 0;
+}
+
+static inline int security_path_rename(const struct path *old_dir,
+				       struct dentry *old_dentry,
+				       const struct path *new_dir,
+				       struct dentry *new_dentry,
+				       unsigned int flags)
+{
+	return 0;
+}
+
+static inline int security_path_chmod(const struct path *path, umode_t mode)
+{
+	return 0;
+}
+
+static inline int security_path_chown(const struct path *path, kuid_t uid, kgid_t gid)
+{
+	return 0;
+}
+
+static inline int security_path_chroot(const struct path *path)
 {
 	return 0;
 }
