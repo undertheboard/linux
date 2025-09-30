@@ -47,8 +47,81 @@ struct fs_context;
 struct fs_parameter;
 struct kernel_siginfo;
 struct timezone;
+struct watch_notification;
+struct request_sock;
+struct flowi_common;
+struct sctp_association;
 
 enum fs_value_type;
+
+/*
+ * Values used in the task_security_ops calls
+ */
+/* setuid or setgid, id0 == uid or gid */
+#define LSM_SETID_ID	1
+
+/* setreuid or setregid, id0 == real, id1 == eff */
+#define LSM_SETID_RE	2
+
+/* setresuid or setresgid, id0 == real, id1 == eff, uid2 == saved */
+#define LSM_SETID_RES	4
+
+/* setfsuid or setfsgid, id0 == fsuid or fsgid */
+#define LSM_SETID_FS	8
+
+/* Flags for security_task_prlimit(). */
+#define LSM_PRLIMIT_READ  1
+#define LSM_PRLIMIT_WRITE 2
+
+/* bprm->unsafe reasons */
+#define LSM_UNSAFE_SHARE	1
+#define LSM_UNSAFE_PTRACE	2
+#define LSM_UNSAFE_NO_NEW_PRIVS	4
+
+#ifdef CONFIG_MMU
+extern unsigned long mmap_min_addr;
+extern unsigned long dac_mmap_min_addr;
+extern int mmap_min_addr_handler(const struct ctl_table *table, int write,
+				 void *buffer, size_t *lenp, loff_t *ppos);
+#else
+#define mmap_min_addr		0UL
+#define dac_mmap_min_addr	0UL
+#endif
+
+/* These functions are in security/commoncap.c */
+extern int cap_capable(const struct cred *cred, struct user_namespace *ns,
+		       int cap, unsigned int opts);
+extern int cap_settime(const struct timespec64 *ts, const struct timezone *tz);
+extern int cap_ptrace_access_check(struct task_struct *child, unsigned int mode);
+extern int cap_ptrace_traceme(struct task_struct *parent);
+extern int cap_capget(const struct task_struct *target, kernel_cap_t *effective,
+		      kernel_cap_t *inheritable, kernel_cap_t *permitted);
+extern int cap_capset(struct cred *new, const struct cred *old,
+		      const kernel_cap_t *effective,
+		      const kernel_cap_t *inheritable,
+		      const kernel_cap_t *permitted);
+extern int cap_bprm_creds_from_file(struct linux_binprm *bprm, const struct file *file);
+int cap_inode_setxattr(struct dentry *dentry, const char *name,
+		       const void *value, size_t size, int flags);
+int cap_inode_removexattr(struct mnt_idmap *idmap,
+			  struct dentry *dentry, const char *name);
+int cap_inode_need_killpriv(struct dentry *dentry);
+int cap_inode_killpriv(struct mnt_idmap *idmap, struct dentry *dentry);
+int cap_inode_getsecurity(struct mnt_idmap *idmap,
+			  struct inode *inode, const char *name, void **buffer,
+			  bool alloc);
+extern int cap_mmap_addr(unsigned long addr);
+extern int cap_task_fix_setuid(struct cred *new, const struct cred *old, int flags);
+extern int cap_task_prctl(int option, unsigned long arg2, unsigned long arg3,
+			  unsigned long arg4, unsigned long arg5);
+extern int cap_task_setscheduler(struct task_struct *p);
+extern int cap_task_setioprio(struct task_struct *p, int ioprio);
+extern int cap_task_setnice(struct task_struct *p, int nice);
+extern int cap_vm_enough_memory(struct mm_struct *mm, long pages);
+
+/* security_inode_init_security callback function to write xattrs */
+typedef int (*initxattrs) (struct inode *inode,
+			   const struct xattr *xattr_array, void *fs_data);
 
 /* Minimal required structures */
 enum lsm_event {
@@ -1278,6 +1351,11 @@ static inline void security_sk_classify(struct sock *sk, struct flowi_common *fl
 {
 }
 
+static inline void security_sk_classify_flow(const struct sock *sk,
+					     struct flowi_common *flic)
+{
+}
+
 static inline void security_req_classify(struct request_sock *req,
 					  struct flowi_common *flic)
 {
@@ -1367,6 +1445,11 @@ static inline void security_sctp_sk_clone(struct sctp_association *asoc,
 
 static inline void security_initramfs_populated(void)
 {
+}
+
+static inline int security_perf_event_open(int type)
+{
+	return 0;
 }
 
 #endif /* ! __LINUX_SECURITY_H */
